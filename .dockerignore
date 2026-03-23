@@ -1,0 +1,14 @@
+node_modules/
+.next/
+dist/
+build/
+.env
+.git/
+.vscode/
+.DS_Store
+# Do not upload the massive database or raw data files, 
+# Render will generate or we will use a persistent volume.
+data/raw/
+data/processed/
+__pycache__/
+*.pyc

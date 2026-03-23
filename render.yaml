@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: starc-monolith
+    env: docker
+    plan: free
+    branch: main
+    numInstances: 1
+    healthCheckPath: /api/metrics
+    envVars:
+      - key: PORT
+        value: 5001
