@@ -1,0 +1,7 @@
+cluster,orbital_period,planet_mass,stellar_mass,distance,count,dominant_type
+0,596.933,280.359,0.87,110.629,1505,Gas Giant
+1,73001.68,4255.792,1.28,170.96,199,Super Jupiter
+2,402000000.0,2542.627,0.37,10.886,1,Super Jupiter
+3,139.33,422.156,1.273,616.785,604,Gas Giant
+4,298899.513,5541.722,6.755,397.634,6,Super Jupiter
+5,4809.286,992.833,0.575,4971.429,7,Gas Giant

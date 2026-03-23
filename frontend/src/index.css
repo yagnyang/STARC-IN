@@ -1,0 +1,139 @@
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;700;800&family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-headline: "Lexend", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-label: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Lexend", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-primary: #ff2d78;
+  --color-primary-container: #b3004e;
+  --color-on-primary: #1a0010;
+  
+  --color-secondary: #00ffcc;
+  --color-on-secondary: #001a1a;
+  
+  --color-background: #0a0a12;
+  --color-on-background: #e8e0f0;
+  
+  --color-surface: #0f0f1a;
+  --color-surface-container: #141422;
+  --color-surface-container-low: #111118;
+  --color-surface-container-high: #1e1e30;
+  --color-on-surface: #e8e0f0;
+  --color-on-surface-variant: #a098b0;
+  
+  --color-outline: #5a5068;
+  --color-outline-variant: #302840;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-on-background font-body overflow-x-hidden;
+  }
+}
+
+@layer utilities {
+  .telemetry-grid {
+    background-image: radial-gradient(circle, var(--color-primary) 0.8px, transparent 0.8px);
+    background-size: 1.75rem 1.75rem;
+    opacity: 0.12;
+  }
+  
+  .luminescent-glow {
+    box-shadow: 0 0 40px 0 rgba(255, 45, 120, 0.3);
+  }
+  
+  .active-glow {
+    box-shadow: 0 0 30px rgba(255, 45, 120, 0.7), 0 0 60px rgba(255, 45, 120, 0.3);
+  }
+  
+  .title-glow {
+    text-shadow: 0 0 30px rgba(255, 45, 120, 0.5);
+  }
+
+  .star-field {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 50%, var(--color-surface-container) 0%, var(--color-surface) 100%);
+  }
+  
+  .star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    opacity: 0;
+    animation: twinkle var(--duration) infinite ease-in-out var(--delay);
+  }
+
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.1; transform: scale(0.8); }
+    50% { opacity: var(--opacity); transform: scale(1.1); }
+  }
+
+  @keyframes twinkle-static {
+    0%, 100% { opacity: 0.2; transform: scale(0.8); }
+    50% { opacity: 0.8; transform: scale(1.1); }
+  }
+
+  @keyframes focus-reveal {
+      0% { filter: blur(20px); opacity: 0; transform: scale(0.95); }
+      100% { filter: blur(0px); opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes breathing-glow {
+      0%, 100% { text-shadow: 0 0 10px rgba(240, 240, 255, 0.2); }
+      50% { text-shadow: 0 0 25px rgba(240, 240, 255, 0.6); }
+  }
+
+  @keyframes fade-in-subtitle {
+      0% { opacity: 0; transform: translateY(10px); }
+      100% { opacity: 0.6; transform: translateY(0); }
+  }
+  
+  .animate-focus {
+      animation: focus-reveal 2.5s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+  }
+
+  .animate-breath {
+      animation: breathing-glow 4s ease-in-out infinite;
+  }
+
+  .animate-fade-up {
+      animation: fade-in-subtitle 1.5s ease-out 2.2s forwards;
+      opacity: 0;
+  }
+
+  .animate-fade-button {
+      animation: fade-in-subtitle 1.2s ease-out 3s forwards;
+      opacity: 0;
+  }
+
+  .title-blur-hover {
+      filter: blur(12px);
+      transition: filter 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .title-blur-hover:hover {
+      filter: blur(0px);
+  }
+
+  .scanline {
+      width: 100%;
+      height: 2px;
+      background: rgba(0, 255, 204, 0.03);
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 10;
+  }
+}

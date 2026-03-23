@@ -1,0 +1,129 @@
+====================================================================
+  HOW TO RUN THE STARC FRONTEND — STEP-BY-STEP BEGINNER GUIDE
+====================================================================
+
+WHAT YOU NEED (Prerequisites)
+-----------------------------
+1. Node.js (version 18 or newer)
+   - Download from: https://nodejs.org
+   - Pick the "LTS" version (recommended for most users)
+   - Install it and restart your terminal after installation
+
+2. Python 3 (only needed if you want to run the ETL pipeline)
+   - Download from: https://python.org
+   - Install it and make sure "Add to PATH" is checked during setup
+
+3. A web browser (Chrome, Firefox, Edge — any modern browser works)
+
+
+STEP-BY-STEP INSTRUCTIONS
+--------------------------
+
+STEP 1: Open a Terminal
+   - On Linux:    Press Ctrl+Alt+T
+   - On Mac:      Open "Terminal" from Applications > Utilities
+   - On Windows:  Open "Command Prompt" or "PowerShell"
+
+
+STEP 2: Navigate to the frontend folder
+   Type this command and press Enter:
+
+       cd /home/yagnyang/Downloads/STARC-exp/frontend
+
+   (If you moved the project folder somewhere else, use that path instead.)
+
+
+STEP 3: Install all required packages
+   Type this command and press Enter:
+
+       npm install
+
+   This will download all the libraries the project needs.
+   It may take 2-5 minutes the first time. Wait until it finishes.
+   You should see a message like "added XXX packages" when it's done.
+
+
+STEP 4: Start the application
+   Type this command and press Enter:
+
+       npm start
+
+   This starts TWO things at the same time:
+     a) The backend server (Express + DuckDB on port 5001)
+     b) The frontend dev server (Vite on port 5173)
+
+   Wait until you see output like:
+     "Server listening on port 5001"
+     "VITE ready in XXXms"
+
+
+STEP 5: Start the FastAPI Catalog Backend
+   Open a NEW terminal window/tab.
+   Navigate to the STARC-exp2 main folder:
+
+       cd /home/yagnyang/Downloads/STARC-exp2
+
+   Run the Python FastAPI server:
+
+       python api/main.py
+       (or uvicorn api.main:app --port 8000 --reload)
+
+   This starts the live data feed for the Catalog charts on port 8000.
+
+
+STEP 6: Open your browser
+   Open your web browser and go to:
+
+       http://localhost:5173
+
+   You should see the STARC landing page with a purple theme
+   and a big "LAUNCH MISSION CONTROL" button.
+
+
+STEP 7: Explore the dashboard
+   Click "LAUNCH MISSION CONTROL" to enter the dashboard.
+
+   The sidebar on the left has four sections:
+     - TELEMETRY   → Charts and key metrics from the exoplanet database
+     - REPOSITORY  → Full-screen Aladin CDS sky viewer (search any star!)
+     - CATALOG     → Discovery methods chart and habitable zone scatter plot
+     - VALIDATION  → STARC-SKY validation status and architecture diagram
+
+
+STEP 8: Stop the application (when you're done)
+   Go back to the terminal and press:
+
+       Ctrl + C
+
+   This will stop both the frontend and backend servers.
+
+
+TROUBLESHOOTING
+---------------
+
+Problem: "npm: command not found"
+  → Node.js is not installed. Go to https://nodejs.org and install it.
+
+Problem: "Port 5173 is already in use"
+  → Another program is using that port. Either close it, or edit
+    package.json and change the port number in the "dev" script.
+
+Problem: Dashboard shows dashes (-) instead of numbers
+  → The backend server may not be running. Make sure you used
+    "npm start" (not "npm run dev") so both servers start together.
+
+Problem: Aladin sky viewer shows "Failed to load"
+  → You need an internet connection. Aladin Lite loads from the
+    CDS Strasbourg servers. Do a hard refresh (Ctrl+Shift+R).
+
+Problem: "npm install" is taking forever
+  → The DuckDB package compiles native C++ code. This can take
+    several minutes. Be patient and let it finish.
+
+
+PROJECT URLS
+------------
+Frontend:  http://localhost:5173
+Backend:   http://localhost:5001
+Catalog API: http://localhost:8000
+====================================================================

@@ -1,0 +1,5 @@
+{
+  "name": "STARC | Mission-Critical Exoplanet Data Engineering",
+  "description": "A high-precision ETL pipeline processing NASA Exoplanet Archive data into a SIMBAD-validated astronomical repository.",
+  "requestFramePermissions": []
+}
