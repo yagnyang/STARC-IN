@@ -1,0 +1,41 @@
+====================================================
+NEXT STEPS: TESTING THE EXODEX ML HABITABILITY VIEWER
+====================================================
+
+You are now ready to test the fully integrated, machine-learning-driven Exodex dashboard! Here is what you need to do:
+
+1. START THE CATALOG / ML BACKEND (FastAPI)
+   Open a terminal and navigate to the project root:
+   cd /home/yagnyang/Downloads/STARC-exp6
+   python3 api/main.py
+   (This starts the Python backend on port 8000 which loads the ML model and communicates with NASA's TAP API).
+
+2. START THE FRONTEND AND TELEMETRY SERVER (Vite + Express)
+   Open a SECOND terminal and navigate to the frontend folder:
+   cd /home/yagnyang/Downloads/STARC-exp6/frontend
+   
+   First, ensure all required packages are installed by running:
+   npm install
+
+   Once the installation is complete, start the application:
+   npm run dev
+   (Note: If "npm run dev" does not start both servers, you can use "npm start" according to your package.json setup. This will start the Express server on port 5001 and the Vite frontend on port 5173).
+
+3. LAUNCH THE DASHBOARD
+   - Open your web browser and navigate to: http://localhost:5173
+   - Click "LAUNCH MISSION CONTROL" to enter the main dashboard.
+
+4. TEST THE EXODEX ML SEARCH
+   - On the left sidebar menu, click on the newly added "EXODEX" tab (which replaces the legacy Validation tab).
+   - In the search bar, type the name of an exoplanet.
+     * Examples: 
+       - Kepler-452 b
+       - LHS 1140 b
+       - KELT-9 b
+       - TRAPPIST-1 d
+   - Click "Scan".
+
+WHAT EXPERIENCING THIS FEATURE WILL SHOW YOU:
+- If the planet exists in your local DuckDB, it will fetch properties instantly.
+- If it is an "unknown" planet to your local dataset, the Python backend will dynamically fetch its parameters from the NASA Exoplanet Archive TAP API in real-time.
+- The pipeline then runs those exact properties through the trained `habitable_classifier.pkl` Random Forest model, and provides a continuous percentage "Habitability Score". The resulting Exodex stat card will dynamically display this prediction along with the fetched parameters.

@@ -23,14 +23,79 @@ from config.config import DB_PATH
 
 app = FastAPI(title="STARC API", version="1.0.0")
 
+import json
+from pydantic import BaseModel
+from typing import Optional
+import pandas as pd
+import pickle
+
+ML_DIR = os.path.dirname(os.path.abspath(__file__))
+
+df_model: pd.DataFrame = None
+kmeans_bundle: dict = None
+gb_bundle: dict = None
+
+@app.on_event("startup")
+def load_assets():
+    global df_model, kmeans_bundle, gb_bundle
+    try:
+        df_model = pd.read_parquet(os.path.join(ML_DIR, "starc_final.parquet"))
+        df_model["_name_lower"] = df_model["pl_name"].str.lower()
+        with open(os.path.join(ML_DIR, "starc_kmeans.pkl"), "rb") as f:
+            kmeans_bundle = pickle.load(f)
+        with open(os.path.join(ML_DIR, "starc_gb.pkl"), "rb") as f:
+            gb_bundle = pickle.load(f)
+        print(f"Loaded {len(df_model)} planets | models ready")
+    except Exception as e:
+        print("ML Models missing or failed to load:", e)
+
+class PlanetStats(BaseModel):
+    orbital_period_days: float
+    planet_mass_earth:   float
+    planet_radius_earth: float
+    eq_temperature_K:    float
+    insolation_flux:     float
+    gravity_earth:       float
+    semi_major_axis_au:  float
+    eccentricity:        float
+    stellar_temperature_K: float
+    stellar_mass_solar:  float
+    in_habitable_zone:   bool
+    distance_parsecs:    float
+
+class PersonalityCard(BaseModel):
+    planet_name:      str
+    host_star:        str
+    archetype:        str
+    archetype_emoji:  str
+    archetype_desc:   str
+    habitability_score: float          # 0–100
+    score_tier:       str              # Potentially Habitable → Instant Death
+    score_emoji:      str
+    one_liner:        str
+    component_scores: dict             # breakdown of the 6 scoring components
+    stats:            PlanetStats
+    discovery_method: str
+    discovery_year:   str
+    
+class SearchResult(BaseModel):
+    planet_name: str
+    archetype:   str
+    score:       float
+    tier:        str
+
+HAB_FEATURES = ["pl_orbper", "pl_rade", "pl_masse", "pl_eqt", "st_teff", "st_rad", "st_mass", "st_met", "sy_dist"]
+
 from api.catalog_upload import router as catalog_router
+from api.forum import router as forum_router
 app.include_router(catalog_router)
+app.include_router(forum_router)
 
 # Allow React dev server to call this API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -183,6 +248,74 @@ def get_distance_distribution():
 @app.get("/health")
 def health():
     return {"status": "ok", "db": os.path.exists(DB_PATH)}
+
+@app.get("/api/exodex/planet", response_model=PersonalityCard)
+def get_planet_personality(name: str):
+    if df_model is None: raise HTTPException(500, "Models not loaded")
+    
+    row = df_model[df_model["_name_lower"] == name.lower()]
+    if row.empty:
+        matches = df_model[df_model["_name_lower"].str.contains(name.lower(), regex=False)]
+        if matches.empty:
+            raise HTTPException(404, f"Planet '{name}' not found.")
+        row = matches.iloc[[0]]
+
+    r = row.iloc[0]
+    return PersonalityCard(
+        planet_name      = str(r["pl_name"]),
+        host_star        = str(r["hostname"]),
+        archetype        = str(r["archetype"]),
+        archetype_emoji  = str(r.get("archetype_emoji", "")),
+        archetype_desc   = str(r.get("archetype_desc", "")),
+        habitability_score = float(r["final_score"]),
+        score_tier       = str(r["score_tier"]),
+        score_emoji      = str(r.get("score_emoji", "")),
+        one_liner        = str(r["one_liner"]),
+        component_scores = {
+            "temperature":       round(float(r["score_temp"]),    1) if "score_temp" in r else 0,
+            "gravity":           round(float(r["score_gravity"]), 1) if "score_gravity" in r else 0,
+            "insolation":        round(float(r["score_insol"]),   1) if "score_insol" in r else 0,
+            "stellar_stability": round(float(r["score_stellar"]), 1) if "score_stellar" in r else 0,
+            "orbit_stability":   round(float(r["score_orbit"]),   1) if "score_orbit" in r else 0,
+            "radius":            round(float(r["score_radius"]),  1) if "score_radius" in r else 0,
+        },
+        stats = PlanetStats(
+            orbital_period_days   = round(float(r.get("pl_orbper", 0)),  4),
+            planet_mass_earth     = round(float(r.get("pl_bmasse", 0)),  4),
+            planet_radius_earth   = round(float(r.get("pl_rade", 0)),    4),
+            eq_temperature_K      = round(float(r.get("pl_eqt", 0)),     2),
+            insolation_flux       = round(float(r.get("pl_insol", 0)),   4),
+            gravity_earth         = round(float(r.get("gravity", 0)),    4),
+            semi_major_axis_au    = round(float(r.get("pl_orbsmax", 0)), 6),
+            eccentricity          = round(float(r.get("pl_orbeccen", 0)),4),
+            stellar_temperature_K = round(float(r.get("st_teff", 0)),    1),
+            stellar_mass_solar    = round(float(r.get("st_mass", 0)),    4),
+            in_habitable_zone     = bool(r.get("in_hz", 0)),
+            distance_parsecs      = round(float(r.get("sy_dist", 0)),    4),
+        ),
+        discovery_method = str(r.get("discoverymethod", "Unknown")),
+        discovery_year   = str(r.get("disc_year", "Unknown")),
+    )
+
+@app.get("/api/exodex/search", response_model=list[SearchResult])
+def search_planets(q: str, limit: int = 12):
+    if df_model is None: return []
+    matches = df_model[df_model["_name_lower"].str.contains(q.lower(), regex=False)].head(limit)
+    if matches.empty: return []
+    return [
+        SearchResult(
+            planet_name = r["pl_name"],
+            archetype   = r["archetype"],
+            score       = round(float(r["final_score"]), 1),
+            tier        = r["score_tier"]
+        ) for _, r in matches.iterrows()
+    ]
+    
+@app.get("/api/exodex/leaderboard/habitable")
+def most_habitable(limit: int = 12):
+    if df_model is None: return []
+    top = df_model.nlargest(limit, "final_score")
+    return [{"name": r["pl_name"], "score": round(float(r["final_score"]), 1), "tier": r["score_tier"], "emoji": r.get("score_emoji", ""), "archetype": r["archetype"], "one_liner": r["one_liner"]} for _, r in top.iterrows()]
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ const ESASkyModal: React.FC<ESASkyModalProps> = ({ onClose }) => {
     return (
         <div className="fixed inset-0 z-[100] flex flex-col bg-[#0a0a0f]">
             {/* Top Bar */}
-            <div className="flex flex-shrink-0 items-center justify-between px-6 py-4 bg-[#131318]/90 border-b border-[#00d4ff]/20">
+            <div className="flex flex-shrink-0 items-center justify-between px-6 py-4 bg-[#131318]/90 border-b border-[#00d4ff]/20 educate-modal-header">
                 <h2 className="text-white font-bold tracking-widest uppercase flex items-center gap-3">
                     ESA Sky — European Space Agency
                     <span className="text-[#00d4ff] text-sm font-mono ml-4 lowercase border border-[#00d4ff]/20 px-2 py-1 bg-[#00d4ff]/10">

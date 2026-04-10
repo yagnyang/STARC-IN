@@ -75,36 +75,68 @@ const AladinViewer: React.FC = () => {
         formData.append("file", file);
 
         try {
-            const res = await fetch("http://localhost:8000/api/upload-catalog", {
+            const res = await fetch(`${import.meta.env.VITE_CATALOG_URL || 'http://localhost:8000'}/api/upload-catalog`, {
                 method: "POST",
                 body: formData,
             });
-            const report: UploadReport = await res.json();
-            setUploadReport(report);
 
-            if (report.status === "ok" && report.votable_url && aladinRef.current) {
-                const fullUrl = `http://localhost:8000${report.votable_url}`;
+            const report: UploadReport | { detail: string } = await res.json();
+
+            if (!res.ok) {
+                // If it's a validation or server error not shaped as UploadReport
+                const msg = (report as { detail: string }).detail || "Unknown error";
+                setError(`Validation failed: ${msg}`);
+                return;
+            }
+
+            const validReport = report as UploadReport;
+            setUploadReport(validReport);
+
+            if (validReport.status === "ok" && validReport.votable_url && aladinRef.current) {
+                const fullUrl = `${import.meta.env.VITE_CATALOG_URL || 'http://localhost:8000'}${validReport.votable_url}`;
                 const catName = file.name.replace(/\.[^.]+$/, "");
                 setOverlayName(catName);
 
-                // Load VOTable as an Aladin catalog overlay
-                const cat = window.A.catalogFromURL(fullUrl, {
-                    name: catName,
-                    color: "#00d4ff",
-                    sourceSize: 10,
-                    onClick: "showTable",
-                });
-                aladinRef.current.addCatalog(cat);
+                try {
+                    // Load VOTable as an Aladin catalog overlay
+                    // Aladin V3 returns a Promise, V2 returns an object synchronously
+                    let cat = window.A.catalogFromURL(fullUrl, {
+                        name: catName,
+                        color: "#00d4ff",
+                        sourceSize: 10,
+                        onClick: "showTable",
+                    });
 
-                // Zoom to first object if possible
-                cat.on("loaded", () => {
-                    const sources = cat.getSources();
-                    if (sources.length > 0) {
-                        aladinRef.current.gotoRaDec(sources[0].ra, sources[0].dec);
+                    if (cat && typeof cat.then === 'function') {
+                        cat = await cat;
                     }
-                });
+
+                    aladinRef.current.addCatalog(cat);
+
+                    const zoomToFirst = () => {
+                        try {
+                            const sources = cat.getSources();
+                            if (sources && sources.length > 0) {
+                                aladinRef.current.gotoRaDec(sources[0].ra, sources[0].dec);
+                            }
+                        } catch (e) {
+                            console.warn("Could not zoom to first object:", e);
+                        }
+                    };
+
+                    if (typeof cat.on === 'function') {
+                        cat.on("loaded", zoomToFirst);
+                    } else {
+                        // V3 Promise already waits for it to load
+                        zoomToFirst();
+                    }
+                } catch (catErr) {
+                    console.error("Aladin overlay error:", catErr);
+                    setError("Catalog uploaded, but Aladin failed to render the layer.");
+                }
             }
         } catch (err) {
+            console.error("Upload error:", err);
             setError("Upload failed. Is the STARC API running on port 8000?");
         } finally {
             setUploading(false);
@@ -116,8 +148,8 @@ const AladinViewer: React.FC = () => {
     return (
         <div className="flex flex-col w-full" style={{ height: 'calc(100vh - 88px)' }}>
             {/* Top bar */}
-            <div className="flex flex-wrap items-center gap-3 justify-between px-6 py-3 bg-[#131318] border-b border-primary/20 shrink-0">
-                <span className="font-mono text-[10px] text-primary uppercase tracking-widest">
+            <div className="flex flex-wrap items-center gap-3 justify-between px-6 py-3 bg-[#131318] border-b border-primary/20 shrink-0 repository-bar">
+                <span className="font-mono text-[13px] text-primary uppercase tracking-widest">
                     CDS Aladin Lite — Stellar Sky Archive
                 </span>
 
@@ -127,12 +159,12 @@ const AladinViewer: React.FC = () => {
                         type="text"
                         value={searchInput}
                         onChange={(e) => setSearchInput(e.target.value)}
-                        className="bg-black/60 border border-primary/30 px-3 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-primary w-56"
+                        className="bg-black/60 border border-primary/30 px-3 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-primary w-56 repository-input"
                         placeholder="Target / coordinates"
                     />
                     <button
                         type="submit"
-                        className="bg-primary/20 hover:bg-primary/40 text-primary border border-primary/30 px-4 py-1.5 font-mono text-xs uppercase tracking-widest transition-colors"
+                        className="bg-primary/20 hover:bg-primary/40 text-primary border border-primary/30 px-4 py-1.5 font-mono text-xs uppercase tracking-widest transition-colors repository-btn"
                     >
                         Resolve
                     </button>
@@ -150,7 +182,7 @@ const AladinViewer: React.FC = () => {
                     <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploading || !ready}
-                        className="bg-primary/10 hover:bg-primary/30 text-primary border border-primary/30 px-4 py-1.5 font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="bg-primary/10 hover:bg-primary/30 text-primary border border-primary/30 px-4 py-1.5 font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 repository-btn"
                     >
                         {uploading ? (
                             <>
@@ -162,22 +194,21 @@ const AladinViewer: React.FC = () => {
                         )}
                     </button>
                     {overlayName && (
-                        <span className="font-mono text-[10px] text-primary/70 uppercase tracking-widest">
+                        <span className="font-mono text-[13px] text-primary/70 uppercase tracking-widest">
                             ● {overlayName} overlaid
                         </span>
                     )}
                 </div>
 
-                {error && <span className="font-mono text-[10px] text-red-400 w-full">{error}</span>}
+                {error && <span className="font-mono text-[13px] text-red-400 w-full">{error}</span>}
             </div>
 
             {/* Upload Report Banner */}
             {uploadReport && (
-                <div className={`px-6 py-2 border-b font-mono text-[10px] flex flex-wrap gap-4 items-center shrink-0 ${
-                    uploadReport.status === "ok"
-                        ? "bg-teal-950/40 border-primary/20 text-primary"
-                        : "bg-red-950/40 border-red-500/20 text-red-400"
-                }`}>
+                <div className={`px-6 py-2 border-b font-mono text-[13px] flex flex-wrap gap-4 items-center shrink-0 ${uploadReport.status === "ok"
+                    ? "bg-teal-950/40 border-primary/20 text-primary"
+                    : "bg-red-950/40 border-red-500/20 text-red-400"
+                    }`}>
                     {uploadReport.status === "ok" ? (
                         <>
                             <span>✓ CATALOG LOADED</span>

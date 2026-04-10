@@ -7,7 +7,7 @@ const StatCards: React.FC = () => {
     const [error, setError] = useState(false);
 
     useEffect(() => {
-        fetch('http://localhost:8000/api/stats')
+        fetch(`${import.meta.env.VITE_CATALOG_URL || 'http://localhost:8000'}/api/stats`)
             .then((res) => {
                 if (!res.ok) throw new Error('Fetch failed');
                 return res.json();

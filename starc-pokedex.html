@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>STARC — Planetary Intelligence Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #04060f;
+    --surface: #080d1a;
+    --surface2: #0c1220;
+    --border: #1a2a45;
+    --accent: #00d4ff;
+    --accent2: #7b61ff;
+    --green: #00ff9f;
+    --yellow: #f5a623;
+    --red: #ff4f6d;
+    --dim: #3a4a6a;
+    --text: #c8d8f0;
+    --text-dim: #5a7090;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Exo 2', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.015) 2px, rgba(0,212,255,0.015) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── Header ─────────────────────────────── */
+  .header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(90deg, rgba(0,212,255,0.04), transparent);
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .header-logo {
+    font-family: var(--mono);
+    font-size: 22px;
+    color: var(--accent);
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(0,212,255,0.5);
+  }
+  .header-sub { font-size: 11px; color: var(--text-dim); letter-spacing: 2px; margin-top: 3px; }
+  .header-right { font-family: var(--mono); font-size: 11px; color: var(--text-dim); text-align: right; }
+  .live-dot {
+    display: inline-block; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── Nav tabs ────────────────────────────── */
+  .nav {
+    display: flex; gap: 2px;
+    padding: 12px 32px 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .nav-btn {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 2px;
+    padding: 10px 20px; border: none; background: transparent;
+    color: var(--text-dim); cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .nav-btn:hover { color: var(--accent); }
+  .nav-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(0,212,255,0.05); }
+
+  /* ── Main layout ─────────────────────────── */
+  .main { padding: 28px 32px; max-width: 1400px; margin: 0 auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ── Section header ──────────────────────── */
+  .sec-title {
+    font-family: var(--mono); font-size: 13px; letter-spacing: 4px;
+    color: var(--accent); margin-bottom: 20px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .sec-title::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  /* ── Global stats grid ───────────────────── */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .stat-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 20px;
+    position: relative; overflow: hidden;
+  }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+  .stat-label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 8px; }
+  .stat-value { font-family: var(--mono); font-size: 28px; color: var(--accent); font-weight: bold; }
+  .stat-sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+  .stats-row2 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+  .info-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 16px;
+  }
+  .info-label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 6px; }
+  .info-value { font-family: var(--mono); font-size: 14px; color: var(--yellow); }
+  .info-sub { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+
+  /* ── Planet card ─────────────────────────── */
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+  .planet-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 20px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    cursor: default;
+  }
+  .planet-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px rgba(0,212,255,0.08);
+  }
+  .card-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 10px; padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-name { font-family: var(--mono); font-size: 15px; color: white; }
+  .card-archetype { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+  .card-score-block { text-align: right; }
+  .card-score { font-family: var(--mono); font-size: 22px; }
+  .card-tier { font-size: 10px; letter-spacing: 1px; margin-top: 2px; }
+
+  .card-liner {
+    font-size: 12px; color: var(--text-dim);
+    font-style: italic; margin: 10px 0;
+    padding: 8px 10px;
+    background: rgba(0,0,0,0.3);
+    border-left: 2px solid var(--accent2);
+    line-height: 1.5;
+  }
+
+  .bars { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; }
+  .bar-label { font-family: var(--mono); font-size: 9px; color: var(--text-dim); width: 55px; flex-shrink: 0; }
+  .bar-track { flex: 1; display: flex; gap: 1px; }
+  .bar-seg {
+    height: 6px; flex: 1; border-radius: 1px;
+    background: var(--dim); transition: background 0.3s;
+  }
+  .bar-seg.filled { background: var(--accent); }
+  .bar-seg.filled.warm { background: var(--yellow); }
+  .bar-seg.filled.hot { background: var(--red); }
+  .bar-val { font-family: var(--mono); font-size: 9px; color: var(--text-dim); width: 28px; text-align: right; }
+
+  /* score colors */
+  .score-green { color: #00ff9f; }
+  .score-yellow { color: #f5a623; }
+  .score-orange { color: #ff8c42; }
+  .score-red { color: #ff4f6d; }
+  .score-skull { color: #ff2050; }
+
+  /* ── Archetype section ───────────────────── */
+  .arch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+  .arch-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 18px; display: flex; gap: 16px; align-items: flex-start;
+  }
+  .arch-emoji { font-size: 32px; flex-shrink: 0; }
+  .arch-name { font-family: var(--mono); font-size: 14px; color: var(--accent); margin-bottom: 6px; }
+  .arch-desc { font-size: 11px; color: var(--text-dim); line-height: 1.5; margin-bottom: 10px; }
+  .arch-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+  .arch-stat { font-family: var(--mono); font-size: 10px; }
+  .arch-stat span { color: var(--yellow); }
+
+  .arch-bar-wrap { margin-top: 10px; }
+  .arch-bar-label { font-family: var(--mono); font-size: 9px; color: var(--text-dim); margin-bottom: 3px; }
+  .arch-bar { height: 4px; background: var(--dim); border-radius: 2px; overflow: hidden; }
+  .arch-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 2px; }
+
+  /* ── Leaderboard ─────────────────────────── */
+  .lb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .lb-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .lb-header { padding: 14px 16px; background: rgba(0,212,255,0.05); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 11px; letter-spacing: 2px; color: var(--accent); }
+  .lb-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; border-bottom: 1px solid rgba(26,42,69,0.5);
+    transition: background 0.15s;
+  }
+  .lb-row:hover { background: rgba(0,212,255,0.03); }
+  .lb-rank { font-family: var(--mono); font-size: 11px; color: var(--text-dim); width: 24px; flex-shrink: 0; }
+  .lb-name { font-family: var(--mono); font-size: 12px; color: var(--text); flex: 1; }
+  .lb-arch { font-size: 10px; color: var(--text-dim); }
+  .lb-score { font-family: var(--mono); font-size: 13px; font-weight: bold; }
+  .lb-temp { font-family: var(--mono); font-size: 12px; }
+
+  /* ── Extreme section ─────────────────────── */
+  .extreme-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .extreme-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 20px; position: relative; overflow: hidden;
+  }
+  .extreme-card::after {
+    content: ''; position: absolute; bottom: 0; right: 0;
+    width: 80px; height: 80px;
+    background: radial-gradient(circle, rgba(0,212,255,0.06), transparent 70%);
+  }
+  .ext-label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 10px; }
+  .ext-name { font-family: var(--mono); font-size: 18px; color: white; margin-bottom: 6px; }
+  .ext-value { font-family: var(--mono); font-size: 24px; color: var(--yellow); margin-bottom: 8px; }
+  .ext-arch { font-size: 11px; color: var(--text-dim); margin-bottom: 10px; }
+  .ext-liner { font-size: 11px; color: var(--text-dim); font-style: italic; line-height: 1.5; padding: 8px; background: rgba(0,0,0,0.3); border-left: 2px solid var(--yellow); }
+
+  /* ── Search ──────────────────────────────── */
+  .search-wrap { margin-bottom: 20px; display: flex; gap: 10px; }
+  .search-input {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 13px;
+    padding: 10px 16px; border-radius: 4px; outline: none;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-dim); }
+  .search-btn {
+    background: rgba(0,212,255,0.1); border: 1px solid var(--accent);
+    color: var(--accent); font-family: var(--mono); font-size: 12px;
+    padding: 10px 20px; border-radius: 4px; cursor: pointer; letter-spacing: 1px;
+  }
+  .search-btn:hover { background: rgba(0,212,255,0.2); }
+
+  .sep { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+  @media (max-width: 768px) {
+    .stats-grid { grid-template-columns: repeat(2,1fr); }
+    .stats-row2 { grid-template-columns: 1fr 1fr; }
+    .lb-grid { grid-template-columns: 1fr; }
+    .extreme-grid { grid-template-columns: 1fr; }
+    .main { padding: 16px; }
+    .nav { padding: 8px 16px 0; }
+    .header { padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-logo">◈ STARC</div>
+    <div class="header-sub">STELLAR TELEMETRY & ASTRONOMICAL REPOSITORY CATALOGUE</div>
+  </div>
+  <div class="header-right">
+    <div><span class="live-dot"></span> ML PIPELINE ACTIVE</div>
+    <div style="margin-top:4px">4,075 PLANETS INDEXED</div>
+    <div style="margin-top:2px">GRADIENT BOOSTING · R²=0.9994</div>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="nav-btn active" onclick="showTab('global')">🔭 GLOBAL STATS</button>
+  <button class="nav-btn" onclick="showTab('habitable')">🌿 MOST HABITABLE</button>
+  <button class="nav-btn" onclick="showTab('hostile')">☠️ MOST HOSTILE</button>
+  <button class="nav-btn" onclick="showTab('archetypes')">🧬 ARCHETYPES</button>
+  <button class="nav-btn" onclick="showTab('leaderboard')">🏆 LEADERBOARDS</button>
+  <button class="nav-btn" onclick="showTab('extremes')">⚡ EXTREMES</button>
+  <button class="nav-btn" onclick="showTab('search')">🔍 SEARCH</button>
+</div>
+
+<div class="main">
+
+<!-- ── SECTION: GLOBAL ───────────────────────── -->
+<div class="section active" id="sec-global">
+  <div class="sec-title">// GLOBAL INTELLIGENCE OVERVIEW</div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">TOTAL PLANETS INDEXED</div>
+      <div class="stat-value">4,075</div>
+      <div class="stat-sub">NASA Exoplanet Archive · 2025</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">AVG HABITABILITY SCORE</div>
+      <div class="stat-value" style="color:var(--yellow)">53.30</div>
+      <div class="stat-sub">Median: 53.78 / 100</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">IN HABITABLE ZONE</div>
+      <div class="stat-value" style="color:var(--green)">40</div>
+      <div class="stat-sub">0.98% of all planets · 57 score ≥85</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">PLANETARY ARCHETYPES</div>
+      <div class="stat-value" style="color:var(--accent2)">7</div>
+      <div class="stat-sub">K-Means · k=7 · Silhouette 0.295</div>
+    </div>
+  </div>
+
+  <div class="stats-row2">
+    <div class="info-card">
+      <div class="info-label">🔥 HOTTEST PLANET</div>
+      <div class="info-value">KELT-9 b</div>
+      <div class="info-sub">4,050 K · 44,900× Earth radiation · 💀 Instant Death</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">🧊 COLDEST PLANET</div>
+      <div class="info-value">G 192-15 c</div>
+      <div class="info-sub">55.9 K · Atmosphere may have frozen to the ground</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">🌿 MOST HABITABLE</div>
+      <div class="info-value">Kepler-1544 b</div>
+      <div class="info-sub">Score 100 / 100 · 🟢 Potentially Habitable · Temperate Wanderers</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">⚫ MOST COMMON ARCHETYPE</div>
+      <div class="info-value">🔥 Scorched Worlds</div>
+      <div class="info-sub">2,613 planets · 64.1% of catalog</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">💀 MOST DANGEROUS ARCHETYPE</div>
+      <div class="info-value">⚫ Dark Dwarfs</div>
+      <div class="info-sub">Avg score: ~16 · 112 planets</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">🏋️ MAX GRAVITY</div>
+      <div class="info-value">Kepler-80 f</div>
+      <div class="info-sub">3,046× Earth gravity · Dark Dwarfs</div>
+    </div>
+  </div>
+
+  <div class="sec-title" style="margin-top:8px">// SCORE TIER DISTRIBUTION</div>
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px">
+    <div class="info-card" style="text-align:center">
+      <div style="font-size:24px;margin-bottom:6px">🟢</div>
+      <div class="info-value" style="font-size:20px">57</div>
+      <div class="info-sub">Potentially Habitable</div>
+    </div>
+    <div class="info-card" style="text-align:center">
+      <div style="font-size:24px;margin-bottom:6px">🟡</div>
+      <div class="info-value" style="font-size:20px;color:var(--yellow)">578</div>
+      <div class="info-sub">Marginally Survivable</div>
+    </div>
+    <div class="info-card" style="text-align:center">
+      <div style="font-size:24px;margin-bottom:6px">🟠</div>
+      <div class="info-value" style="font-size:20px;color:#ff8c42">2,462</div>
+      <div class="info-sub">Hostile</div>
+    </div>
+    <div class="info-card" style="text-align:center">
+      <div style="font-size:24px;margin-bottom:6px">🔴</div>
+      <div class="info-value" style="font-size:20px;color:var(--red)">892</div>
+      <div class="info-sub">Extremely Hostile</div>
+    </div>
+    <div class="info-card" style="text-align:center">
+      <div style="font-size:24px;margin-bottom:6px">💀</div>
+      <div class="info-value" style="font-size:20px;color:#ff2050">86</div>
+      <div class="info-sub">Instant Death</div>
+    </div>
+  </div>
+
+  <div class="sec-title">// MODEL PERFORMANCE</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+    <div class="info-card">
+      <div class="info-label">HABITABILITY MODEL</div>
+      <div class="info-value">Gradient Boosting Regressor</div>
+      <div class="info-sub">R² = 0.9994 · MAE = 0.24 / 100 · 10-fold CV</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">CLUSTERING MODEL</div>
+      <div class="info-value">K-Means (k=7)</div>
+      <div class="info-sub">Silhouette = 0.295 · Davies-Bouldin = 0.986</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">FEATURES ENGINEERED</div>
+      <div class="info-value">28 total features</div>
+      <div class="info-sub">Log transforms · Gravity · HZ bounds · Stellar luminosity</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SECTION: HABITABLE ────────────────────── -->
+<div class="section" id="sec-habitable">
+  <div class="sec-title">// TOP 10 MOST HABITABLE PLANETS — 🟢 POTENTIALLY HABITABLE TIER</div>
+  <div class="cards-grid" id="habitable-cards"></div>
+</div>
+
+<!-- ── SECTION: HOSTILE ──────────────────────── -->
+<div class="section" id="sec-hostile">
+  <div class="sec-title">// TOP 10 MOST HOSTILE PLANETS — ☠️ DO NOT VISIT</div>
+  <div class="cards-grid" id="hostile-cards"></div>
+</div>
+
+<!-- ── SECTION: ARCHETYPES ───────────────────── -->
+<div class="section" id="sec-archetypes">
+  <div class="sec-title">// 7 PLANETARY ARCHETYPES — K-MEANS CLUSTERING</div>
+  <div class="arch-grid" id="arch-cards"></div>
+</div>
+
+<!-- ── SECTION: LEADERBOARD ─────────────────── -->
+<div class="section" id="sec-leaderboard">
+  <div class="sec-title">// PLANETARY LEADERBOARDS</div>
+  <div class="lb-grid">
+    <div class="lb-card">
+      <div class="lb-header">🌱 MOST HABITABLE PLANETS</div>
+      <div id="lb-hab"></div>
+    </div>
+    <div class="lb-card">
+      <div class="lb-header">☠️ MOST HOSTILE PLANETS</div>
+      <div id="lb-hostile"></div>
+    </div>
+    <div class="lb-card">
+      <div class="lb-header">🔥 HIGHEST TEMPERATURE</div>
+      <div id="lb-hot"></div>
+    </div>
+    <div class="lb-card">
+      <div class="lb-header">🧊 COLDEST PLANETS</div>
+      <div id="lb-cold"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SECTION: EXTREMES ─────────────────────── -->
+<div class="section" id="sec-extremes">
+  <div class="sec-title">// EXTREME PLANET ANALYSIS</div>
+  <div class="extreme-grid" id="extreme-cards"></div>
+</div>
+
+<!-- ── SECTION: SEARCH ───────────────────────── -->
+<div class="section" id="sec-search">
+  <div class="sec-title">// PLANET SEARCH — QUICK LOOKUP</div>
+  <div class="search-wrap">
+    <input class="search-input" id="search-input" placeholder="Enter planet name... e.g. KELT-9 b, Kepler-452 b, TRAPPIST-1 e" onkeydown="if(event.key==='Enter')doSearch()"/>
+    <button class="search-btn" onclick="doSearch()">▶ SCAN</button>
+  </div>
+  <div id="search-result"></div>
+  <div style="margin-top:24px">
+    <div class="sec-title">// QUICK ACCESS — NOTABLE PLANETS</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
+      ${['KELT-9 b','Kepler-452 b','TRAPPIST-1 e','Proxima Cen b','K2-141 b','KELT-1 b','G 192-15 c','Wolf 1069 b','Kepler-1544 b','TOI-700 d'].map(n=>`<button onclick="quickSearch('${n}')" style="font-family:var(--mono);font-size:11px;padding:6px 14px;background:rgba(0,212,255,0.06);border:1px solid var(--border);color:var(--text-dim);border-radius:3px;cursor:pointer">${n}</button>`).join('')}
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<script>
+// ── DATA ───────────────────────────────────────────────────────────
+const DATA = {
+  top10: [
+    {pl_name:"Kepler-1544 b",final_score:100,score_tier:"Potentially Habitable",archetype:"Temperate Wanderers",archetype_emoji:"🌿",pl_eqt:269,gravity:1.21,pl_insol:0.833,score_temp:97.8,score_gravity:100,score_insol:100,score_stellar:100,score_orbit:100,score_radius:100,one_liner:"Actually ticks almost every habitability box. Astronomers are cautiously excited. Don't book flights yet.",score_emoji:"🟢"},
+    {pl_name:"Kepler-452 b",final_score:97.94,score_tier:"Potentially Habitable",archetype:"Temperate Wanderers",archetype_emoji:"🌿",pl_eqt:265,gravity:1.24,pl_insol:1.1,score_temp:95.6,score_gravity:100,score_insol:100,score_stellar:100,score_orbit:100,score_radius:100,one_liner:"One of the most Earth-like planets found so far. Which is still very, very far from Earth-like.",score_emoji:"🟢"},
+    {pl_name:"Kepler-1653 b",final_score:97.43,score_tier:"Potentially Habitable",archetype:"Temperate Wanderers",archetype_emoji:"🌿",pl_eqt:284,gravity:1.14,pl_insol:0.98,score_temp:100,score_gravity:100,score_insol:100,score_stellar:100,score_orbit:100,score_radius:54.1,one_liner:"Actually ticks almost every habitability box. Astronomers are cautiously excited. Don't book flights yet.",score_emoji:"🟢"},
+    {pl_name:"Kepler-296 f",final_score:96.1,score_tier:"Potentially Habitable",archetype:"Scorched Worlds",archetype_emoji:"🔥",pl_eqt:274,gravity:1.2,pl_insol:0.62,score_temp:100,score_gravity:100,score_insol:100,score_stellar:60,score_orbit:46,score_radius:100,one_liner:"Actually ticks almost every habitability box. Astronomers are cautiously excited. Don't book flights yet.",score_emoji:"🟢"},
+    {pl_name:"TOI-700 d",final_score:95.59,score_tier:"Potentially Habitable",archetype:"Scorched Worlds",archetype_emoji:"🔥",pl_eqt:268.8,gravity:1.09,pl_insol:0.85,score_temp:97.5,score_gravity:100,score_insol:100,score_stellar:60,score_orbit:100,score_radius:100,one_liner:"Actually ticks almost every habitability box. Astronomers are cautiously excited. Don't book flights yet.",score_emoji:"🟢"},
+    {pl_name:"L 98-59 f",final_score:95.44,score_tier:"Potentially Habitable",archetype:"Scorched Worlds",archetype_emoji:"🔥",pl_eqt:285,gravity:1.28,pl_insol:1.1,score_temp:100,score_gravity:100,score_insol:100,score_stellar:60,score_orbit:100,score_radius:100,one_liner:"Actually ticks almost every habitability box. Astronomers are cautiously excited. Don't book flights yet.",score_emoji:"🟢"},
+    {pl_name:"Kepler-1652 b",final_score:95.35,score_tier:"Potentially Habitable",archetype:"Scorched Worlds",archetype_emoji:"🔥",pl_eqt:268,gravity:1.24,pl_insol:0.81,score_temp:97.3,score_gravity:100,score_insol:100,score_stellar:60,score_orbit:100,score_radius:100,one_liner:"Actually ticks almost every habitability box. Astronomers are cautiously excited. Don't book flights yet.",score_emoji:"🟢"},
+    {pl_name:"Kepler-1410 b",final_score:94.72,score_tier:"Potentially Habitable",archetype:"Scorched Worlds",archetype_emoji:"🔥",pl_eqt:290,gravity:1.2,pl_insol:1.06,score_temp:100,score_gravity:100,score_insol:100,score_stellar:60,score_orbit:100,score_radius:100,one_liner:"Actually ticks almost every habitability box. Astronomers are cautiously excited. Don't book flights yet.",score_emoji:"🟢"},
+    {pl_name:"Kepler-1540 b",final_score:94.48,score_tier:"Potentially Habitable",archetype:"Temperate Wanderers",archetype_emoji:"🌿",pl_eqt:266,gravity:1.09,pl_insol:0.849,score_temp:96.3,score_gravity:100,score_insol:100,score_stellar:100,score_orbit:100,score_radius:70,one_liner:"Actually ticks almost every habitability box. Astronomers are cautiously excited. Don't book flights yet.",score_emoji:"🟢"},
+    {pl_name:"Kepler-442 b",final_score:93.93,score_tier:"Potentially Habitable",archetype:"Temperate Wanderers",archetype_emoji:"🌿",pl_eqt:241,gravity:1.31,pl_insol:0.66,score_temp:87.7,score_gravity:100,score_insol:100,score_stellar:100,score_orbit:100,score_radius:100,one_liner:"Actually ticks almost every habitability box. Astronomers are cautiously excited. Don't book flights yet.",score_emoji:"🟢"},
+  ],
+  bot10: [
+    {pl_name:"TOI-1994 b",final_score:6.88,score_tier:"Instant Death",archetype:"Dark Dwarfs",archetype_emoji:"⚫",pl_eqt:2290,gravity:312,pl_insol:1910,score_temp:0,score_gravity:0,score_insol:0,score_stellar:30,score_orbit:100,score_radius:0,one_liner:"At 7024 Earth masses, this is less a planet and more a star that gave up on ignition.",score_emoji:"💀"},
+    {pl_name:"HATS-70 b",final_score:7.9,score_tier:"Instant Death",archetype:"Dark Dwarfs",archetype_emoji:"⚫",pl_eqt:2730,gravity:280,pl_insol:9110,score_temp:0,score_gravity:0,score_insol:0,score_stellar:5,score_orbit:100,score_radius:0,one_liner:"At 2730K, even the concept of landing here is optimistic. You'd become plasma.",score_emoji:"💀"},
+    {pl_name:"KOI-13 b",final_score:9.5,score_tier:"Instant Death",archetype:"Dark Dwarfs",archetype_emoji:"⚫",pl_eqt:2550,gravity:254,pl_insol:25339,score_temp:0,score_gravity:0,score_insol:0,score_stellar:30,score_orbit:100,score_radius:0,one_liner:"Receives 25,339x Earth's radiation. Your SPF would need to be SPF-infinity.",score_emoji:"💀"},
+    {pl_name:"HAT-P-70 b",final_score:10.65,score_tier:"Instant Death",archetype:"Hellfire Titans",archetype_emoji:"🌋",pl_eqt:2562,gravity:12.7,pl_insol:5405,score_temp:0,score_gravity:0,score_insol:0,score_stellar:5,score_orbit:100,score_radius:0,one_liner:"At 2562K, your spacecraft would melt before your travel pillow did.",score_emoji:"💀"},
+    {pl_name:"TOI-1431 b",final_score:12.81,score_tier:"Instant Death",archetype:"Hellfire Titans",archetype_emoji:"🌋",pl_eqt:2370,gravity:8.1,pl_insol:5300,score_temp:0,score_gravity:0,score_insol:0,score_stellar:5,score_orbit:100,score_radius:0,one_liner:"At 2370K, your spacecraft would melt before your travel pillow did.",score_emoji:"💀"},
+    {pl_name:"KELT-9 b",final_score:13.06,score_tier:"Instant Death",archetype:"Inferno Jupiters",archetype_emoji:"☀️",pl_eqt:4050,gravity:5.2,pl_insol:44900,score_temp:0,score_gravity:0,score_insol:0,score_stellar:30,score_orbit:100,score_radius:0,one_liner:"At 4050K, even the concept of landing here is optimistic. You'd become plasma.",score_emoji:"💀"},
+    {pl_name:"KELT-20 b",final_score:14.55,score_tier:"Instant Death",archetype:"Hellfire Titans",archetype_emoji:"🌋",pl_eqt:2262,gravity:7.4,pl_insol:4362,score_temp:0,score_gravity:0,score_insol:0,score_stellar:5,score_orbit:100,score_radius:0,one_liner:"Surface temp: 2262K. That's hotter than some stars. Pack nothing — it won't help.",score_emoji:"💀"},
+    {pl_name:"Kepler-1658 b",final_score:14.99,score_tier:"Instant Death",archetype:"Dark Dwarfs",archetype_emoji:"⚫",pl_eqt:2034,gravity:188,pl_insol:4055,score_temp:0,score_gravity:0,score_insol:0,score_stellar:100,score_orbit:100,score_radius:0,one_liner:"At 1868 Earth masses, this is less a planet and more a star that gave up on ignition.",score_emoji:"💀"},
+    {pl_name:"WASP-72 b",final_score:15.76,score_tier:"Instant Death",archetype:"Hellfire Titans",archetype_emoji:"🌋",pl_eqt:2210,gravity:4.1,pl_insol:2007,score_temp:0,score_gravity:0,score_insol:0,score_stellar:30,score_orbit:100,score_radius:0,one_liner:"Surface temp: 2210K. That's hotter than some stars. Pack nothing — it won't help.",score_emoji:"💀"},
+    {pl_name:"KELT-21 b",final_score:15.94,score_tier:"Instant Death",archetype:"Hellfire Titans",archetype_emoji:"🌋",pl_eqt:2051,gravity:6.3,pl_insol:2950,score_temp:0,score_gravity:0,score_insol:0,score_stellar:5,score_orbit:100,score_radius:0,one_liner:"A balmy 2051K. Tungsten melts at 3695K, so you've got that going for you. Barely.",score_emoji:"💀"},
+  ],
+  hottest: [
+    {pl_name:"KELT-9 b",pl_eqt:4050,final_score:13.06,archetype:"Inferno Jupiters"},
+    {pl_name:"HATS-70 b",pl_eqt:2730,final_score:7.9,archetype:"Dark Dwarfs"},
+    {pl_name:"KOI-13 b",pl_eqt:2550,final_score:9.5,archetype:"Dark Dwarfs"},
+    {pl_name:"HAT-P-70 b",pl_eqt:2562,final_score:10.65,archetype:"Hellfire Titans"},
+    {pl_name:"TOI-1431 b",pl_eqt:2370,final_score:12.81,archetype:"Hellfire Titans"},
+    {pl_name:"TOI-1994 b",pl_eqt:2290,final_score:6.88,archetype:"Dark Dwarfs"},
+    {pl_name:"KELT-20 b",pl_eqt:2262,final_score:14.55,archetype:"Hellfire Titans"},
+    {pl_name:"WASP-72 b",pl_eqt:2210,final_score:15.76,archetype:"Hellfire Titans"},
+    {pl_name:"KELT-21 b",pl_eqt:2051,final_score:15.94,archetype:"Hellfire Titans"},
+    {pl_name:"Kepler-1658 b",pl_eqt:2034,final_score:14.99,archetype:"Dark Dwarfs"},
+  ],
+  coldest: [
+    {pl_name:"G 192-15 c",pl_eqt:55.9,final_score:44.5,archetype:"Temperate Wanderers"},
+    {pl_name:"Kepler-90 h",pl_eqt:66,final_score:38.2,archetype:"Frozen Giants"},
+    {pl_name:"HD 192310 c",pl_eqt:80,final_score:41.1,archetype:"Frozen Giants"},
+    {pl_name:"GJ 1061 d",pl_eqt:91,final_score:58.2,archetype:"Temperate Wanderers"},
+    {pl_name:"55 Cnc f",pl_eqt:94,final_score:40.3,archetype:"Frozen Giants"},
+    {pl_name:"HD 40307 g",pl_eqt:96,final_score:62.1,archetype:"Temperate Wanderers"},
+    {pl_name:"Barnard b",pl_eqt:99,final_score:44.4,archetype:"Temperate Wanderers"},
+    {pl_name:"GJ 667C f",pl_eqt:105,final_score:55.8,archetype:"Temperate Wanderers"},
+    {pl_name:"eps Eridani b",pl_eqt:112,final_score:38.7,archetype:"Frozen Giants"},
+    {pl_name:"GJ 163 d",pl_eqt:116,final_score:61.3,archetype:"Temperate Wanderers"},
+  ],
+  archetypes: [
+    {archetype:"Scorched Worlds",emoji:"🔥",count:2613,avg_score:54.2,med_temp:793,desc:"Hot, small, and dangerously close to their star. The most common fate for a planet in this galaxy.",pct:64.1},
+    {archetype:"Inferno Jupiters",emoji:"☀️",count:538,avg_score:28.4,med_temp:1406,desc:"Gas giants on suicidal orbits — completing a year in days, soaked in 600× Earth's radiation.",pct:13.2},
+    {archetype:"Temperate Wanderers",emoji:"🌿",count:418,avg_score:67.8,med_temp:414,desc:"The hopefuls — cooler temperatures, longer years, and home to most of the habitable zone candidates.",pct:10.3},
+    {archetype:"Hellfire Titans",emoji:"🌋",count:355,avg_score:24.1,med_temp:1103,desc:"Giant planets baked by intense radiation — hot, heavy, and completely unlivable.",pct:8.7},
+    {archetype:"Dark Dwarfs",emoji:"⚫",count:112,avg_score:16.3,med_temp:914,desc:"Impossibly dense — packing over 1,000 Earth masses into a tiny frame. One step from being a star.",pct:2.7},
+    {archetype:"Phantom Heavyweights",emoji:"👻",count:25,avg_score:22.4,med_temp:930,desc:"Near-stellar behemoths with crushing gravity and no clear reason to be called a planet.",pct:0.6},
+    {archetype:"Frozen Giants",emoji:"❄️",count:14,avg_score:39.6,med_temp:175,desc:"Massive cold worlds drifting far from their stars in permanent darkness and ice.",pct:0.3},
+  ],
+  extremes: {
+    max_gravity:{name:"Kepler-80 f",value:3046.1,score:19.2,archetype:"Dark Dwarfs",one_liner:"Surface gravity is 3046x Earth's. You'd weigh 213,220kg. Your knees would file a restraining order."},
+    max_eccen:{name:"HD 80869 b",value:0.924,score:31.4,archetype:"Scorched Worlds",one_liner:"Orbital eccentricity of 0.92 — this planet swings from broiling to freezing every single year. Chaotic doesn't cover it."},
+    max_insol:{name:"KELT-9 b",value:44900,score:13.06,archetype:"Inferno Jupiters",one_liner:"Receives 44,900x Earth's solar radiation. Your SPF would need to be SPF-infinity."},
+    most_balanced:{name:"Kepler-1544 b",score:100,archetype:"Temperate Wanderers",one_liner:"Actually ticks almost every habitability box. Astronomers are cautiously excited. Don't book flights yet."},
+  }
+};
+
+// Planet lookup for search
+const PLANET_LOOKUP = {};
+[...DATA.top10, ...DATA.bot10].forEach(p => { PLANET_LOOKUP[p.pl_name.toLowerCase()] = p; });
+
+// ── Helpers ────────────────────────────────────────────────────────
+function scoreColor(s) {
+  if(s>=85) return 'score-green';
+  if(s>=65) return 'score-yellow';
+  if(s>=45) return 'score-orange';
+  if(s>=25) return 'score-red';
+  return 'score-skull';
+}
+
+function bar(val, max=100) {
+  const filled = Math.round((val/max)*10);
+  const heat = val > 70 ? 'hot' : val > 40 ? 'warm' : '';
+  return Array.from({length:10},(_,i)=>`<div class="bar-seg${i<filled?' filled '+heat:''}"></div>`).join('');
+}
+
+function planetCard(p) {
+  const sc = scoreColor(p.final_score);
+  return `
+  <div class="planet-card">
+    <div class="card-header">
+      <div>
+        <div class="card-name">🪐 ${p.pl_name}</div>
+        <div class="card-archetype">${p.archetype_emoji} ${p.archetype}</div>
+      </div>
+      <div class="card-score-block">
+        <div class="card-score ${sc}">${p.final_score.toFixed(1)}<span style="font-size:13px;color:var(--text-dim)">/100</span></div>
+        <div class="card-tier">${p.score_emoji} ${p.score_tier.toUpperCase()}</div>
+      </div>
+    </div>
+    <div class="card-liner">"${p.one_liner}"</div>
+    <div class="bars">
+      <div class="bar-row"><span class="bar-label">TEMP</span><div class="bar-track">${bar(p.score_temp)}</div><span class="bar-val">${Math.round(p.score_temp)}</span></div>
+      <div class="bar-row"><span class="bar-label">INSOL</span><div class="bar-track">${bar(p.score_insol)}</div><span class="bar-val">${Math.round(p.score_insol)}</span></div>
+      <div class="bar-row"><span class="bar-label">GRAVITY</span><div class="bar-track">${bar(p.score_gravity)}</div><span class="bar-val">${Math.round(p.score_gravity)}</span></div>
+      <div class="bar-row"><span class="bar-label">STELLAR</span><div class="bar-track">${bar(p.score_stellar)}</div><span class="bar-val">${Math.round(p.score_stellar)}</span></div>
+      <div class="bar-row"><span class="bar-label">ORBIT</span><div class="bar-track">${bar(p.score_orbit)}</div><span class="bar-val">${Math.round(p.score_orbit)}</span></div>
+      <div class="bar-row"><span class="bar-label">RADIUS</span><div class="bar-track">${bar(p.score_radius)}</div><span class="bar-val">${Math.round(p.score_radius)}</span></div>
+    </div>
+  </div>`;
+}
+
+// ── Render sections ────────────────────────────────────────────────
+document.getElementById('habitable-cards').innerHTML = DATA.top10.map(planetCard).join('');
+document.getElementById('hostile-cards').innerHTML   = DATA.bot10.map(planetCard).join('');
+
+// Archetypes
+document.getElementById('arch-cards').innerHTML = DATA.archetypes.map(a => `
+  <div class="arch-card">
+    <div class="arch-emoji">${a.emoji}</div>
+    <div style="flex:1">
+      <div class="arch-name">${a.archetype}</div>
+      <div class="arch-desc">${a.desc}</div>
+      <div class="arch-stats">
+        <div class="arch-stat">COUNT <span>${a.count.toLocaleString()}</span></div>
+        <div class="arch-stat">AVG SCORE <span>${a.avg_score.toFixed(1)}</span></div>
+        <div class="arch-stat">MED TEMP <span>${a.med_temp}K</span></div>
+        <div class="arch-stat">% CATALOG <span>${a.pct}%</span></div>
+      </div>
+      <div class="arch-bar-wrap">
+        <div class="arch-bar-label">SHARE OF DATASET</div>
+        <div class="arch-bar"><div class="arch-bar-fill" style="width:${a.pct}%"></div></div>
+      </div>
+    </div>
+  </div>`).join('');
+
+// Leaderboards
+function lbRow(i, p, valKey, valFmt, colorClass) {
+  const medals = ['🥇','🥈','🥉'];
+  const rank = i<3 ? medals[i] : `#${i+1}`;
+  const val = valKey ? p[valKey] : p.final_score;
+  return `<div class="lb-row">
+    <span class="lb-rank">${rank}</span>
+    <div style="flex:1"><div class="lb-name">${p.pl_name}</div><div class="lb-arch">${p.archetype||''}</div></div>
+    <span class="lb-score ${colorClass}">${valFmt(val)}</span>
+  </div>`;
+}
+document.getElementById('lb-hab').innerHTML     = DATA.top10.map((p,i)=>lbRow(i,p,'final_score',v=>v.toFixed(1)+'/100','score-green')).join('');
+document.getElementById('lb-hostile').innerHTML = DATA.bot10.map((p,i)=>lbRow(i,p,'final_score',v=>v.toFixed(1)+'/100','score-skull')).join('');
+document.getElementById('lb-hot').innerHTML     = DATA.hottest.map((p,i)=>lbRow(i,p,'pl_eqt',v=>v.toFixed(0)+'K','score-skull')).join('');
+document.getElementById('lb-cold').innerHTML    = DATA.coldest.map((p,i)=>lbRow(i,p,'pl_eqt',v=>v.toFixed(0)+'K','score-yellow')).join('');
+
+// Extremes
+const ex = DATA.extremes;
+document.getElementById('extreme-cards').innerHTML = `
+  <div class="extreme-card">
+    <div class="ext-label">🏋️ HIGHEST GRAVITY</div>
+    <div class="ext-name">${ex.max_gravity.name}</div>
+    <div class="ext-value">${ex.max_gravity.value.toLocaleString()}× Earth</div>
+    <div class="ext-arch">${ex.max_gravity.archetype} · Score: ${ex.max_gravity.score}/100</div>
+    <div class="ext-liner">"${ex.max_gravity.one_liner}"</div>
+  </div>
+  <div class="extreme-card">
+    <div class="ext-label">🌀 MOST ECCENTRIC ORBIT</div>
+    <div class="ext-name">${ex.max_eccen.name}</div>
+    <div class="ext-value">e = ${ex.max_eccen.value}</div>
+    <div class="ext-arch">${ex.max_eccen.archetype} · Score: ${ex.max_eccen.score}/100</div>
+    <div class="ext-liner">"${ex.max_eccen.one_liner}"</div>
+  </div>
+  <div class="extreme-card">
+    <div class="ext-label">☀️ HIGHEST INSOLATION</div>
+    <div class="ext-name">${ex.max_insol.name}</div>
+    <div class="ext-value">${ex.max_insol.value.toLocaleString()}× Earth flux</div>
+    <div class="ext-arch">${ex.max_insol.archetype} · Score: ${ex.max_insol.score}/100</div>
+    <div class="ext-liner">"${ex.max_insol.one_liner}"</div>
+  </div>
+  <div class="extreme-card">
+    <div class="ext-label">⚖️ MOST BALANCED — CLOSEST TO IDEAL</div>
+    <div class="ext-name">${ex.most_balanced.name}</div>
+    <div class="ext-value">Score: ${ex.most_balanced.score} / 100</div>
+    <div class="ext-arch">${ex.most_balanced.archetype} · 🟢 Potentially Habitable</div>
+    <div class="ext-liner">"${ex.most_balanced.one_liner}"</div>
+  </div>`;
+
+// ── Tab switching ──────────────────────────────────────────────────
+function showTab(tab) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+tab).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── Search ─────────────────────────────────────────────────────────
+const ALL_PLANETS = [...DATA.top10, ...DATA.bot10];
+
+function doSearch() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  if(!q) return;
+  const match = ALL_PLANETS.find(p => p.pl_name.toLowerCase().includes(q));
+  const el = document.getElementById('search-result');
+  if(match) {
+    el.innerHTML = `<div class="sec-title" style="margin-bottom:16px">// SCAN RESULT</div><div class="cards-grid">${planetCard(match)}</div>`;
+  } else {
+    el.innerHTML = `<div style="font-family:var(--mono);font-size:12px;color:var(--text-dim);padding:20px;border:1px solid var(--border);border-radius:4px">⚠ PLANET NOT FOUND IN QUICK CACHE — "${q}" — Try: KELT-9 b, Kepler-452 b, TRAPPIST-1 e, TOI-700 d, Wolf 1069 b</div>`;
+  }
+}
+
+function quickSearch(name) {
+  document.getElementById('search-input').value = name;
+  doSearch();
+}
+</script>
+</body>
+</html>
