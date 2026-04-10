@@ -2,6 +2,8 @@ FROM node:18-slim AS build
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+
 # Build arguments for API routing
 ARG VITE_API_URL=http://localhost:5001
 ARG VITE_CATALOG_URL=http://localhost:8000
